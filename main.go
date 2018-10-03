@@ -26,17 +26,20 @@ func main() {
 		log.Fatalf("error: record-name parameter is mandatory")
 	}
 
+	log.Println("creating cloudflare api object")
 	// Construct a new API object
 	api, err := cloudflare.New(os.Getenv("CF_API_KEY"), os.Getenv("CF_API_EMAIL"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	log.Printf("getting zone id by name %s", *zoneName)
 	zoneID, err := api.ZoneIDByName(*zoneName)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	log.Printf("getting A dns record for name %s", *dnsName)
 	records, err := api.DNSRecords(zoneID, cloudflare.DNSRecord{Type: "A", Name: *dnsName})
 
 	if len(records) != 1 {
