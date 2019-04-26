@@ -19,6 +19,7 @@ var (
 	refreshInterval = flag.Int64("refresh-interval", 300, "Interval in seconds between record updates (default 300s)")
 	publicIPURL     = flag.String("public-ip-url", "https://checkip.amazonaws.com/", "URI to fetch the current public ip address")
 	maxBackoff      = flag.Duration("max-backoff", time.Minute*30, "maximum value for exponential backoff")
+	once            = flag.Bool("once", false, "only update once and exit")
 	backoff         exponentialBackoffSleep
 )
 
@@ -47,6 +48,18 @@ func main() {
 		log.Fatalf("error: record-name parameter is mandatory")
 	}
 
+	if *once {
+		api, zoneID, record, err := initialize()
+		if err != nil {
+			log.Fatalf("error on initialize: %v", err)
+		}
+
+		if err := update(api, zoneID, record); err != nil {
+			log.Fatalf("error on update: %v", err)
+		}
+		return
+	}
+
 	backoff = exponentialBackoffSleep{
 		*maxBackoff,
 		time.Second,
@@ -54,7 +67,7 @@ func main() {
 
 	var err error
 	for {
-		err = Run()
+		err = run()
 		if err != nil {
 			log.Printf("error: %v", err)
 			backoff.Sleep()
@@ -62,55 +75,71 @@ func main() {
 	}
 }
 
-func Run() error {
+func run() error {
+	api, zoneID, record, err := initialize()
+	if err != nil {
+		return err
+	}
+
+	for {
+		if err := update(api, zoneID, record); err != nil {
+			return err
+		}
+		backoff.Reset()
+		time.Sleep(time.Second * time.Duration(*refreshInterval))
+	}
+}
+
+func initialize() (api *cloudflare.API, zoneID string, record cloudflare.DNSRecord, err error) {
 	log.Println("creating cloudflare api object")
 	// Construct a new API object
-	api, err := cloudflare.New(os.Getenv("CF_API_KEY"), os.Getenv("CF_API_EMAIL"))
+	api, err = cloudflare.New(os.Getenv("CF_API_KEY"), os.Getenv("CF_API_EMAIL"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	log.Printf("getting zone id by name %s", *zoneName)
-	zoneID, err := api.ZoneIDByName(*zoneName)
+	zoneID, err = api.ZoneIDByName(*zoneName)
 	if err != nil {
-		return err
+		err = fmt.Errorf("error getting dns record: %v", err)
+		return
 	}
 
 	log.Printf("getting A dns record for name %s", *dnsName)
 	records, err := api.DNSRecords(zoneID, cloudflare.DNSRecord{Type: "A", Name: *dnsName})
 	if err != nil {
-		return fmt.Errorf("error getting dns record: %v", err)
+		err = fmt.Errorf("error getting dns record: %v", err)
+		return
 	}
 	if len(records) != 1 {
-		return fmt.Errorf("error: dns record not found")
+		err = fmt.Errorf("error getting dns record: %v", err)
+		return
 	}
 
-	record := records[0]
+	record = records[0]
+	return
+}
 
-	var public string
-
-	for {
-		public, err = getPublicIP()
+func update(api *cloudflare.API, zoneID string, record cloudflare.DNSRecord) error {
+	public, err := getPublicIP()
+	if err != nil {
+		return fmt.Errorf("error getting public ip: %v", err)
+	}
+	public = strings.TrimSuffix(public, "\n")
+	if public != record.Content {
+		record.Content = public
+		err = api.UpdateDNSRecord(zoneID, record.ID, cloudflare.DNSRecord{
+			Content: public,
+		})
 		if err != nil {
-			return fmt.Errorf("error getting public ip: %v", err)
-		}
-		public = strings.TrimSuffix(public, "\n")
-		if public != record.Content {
-			record.Content = public
-			err = api.UpdateDNSRecord(zoneID, record.ID, cloudflare.DNSRecord{
-				Content: public,
-			})
-			if err != nil {
-				return fmt.Errorf("error updating dns record to %s: %v", public, err)
-			} else {
-				log.Printf("successfully updated ip from to %s", public)
-			}
+			return fmt.Errorf("error updating dns record to %s: %v", public, err)
 		} else {
-			log.Printf("no update needed")
+			log.Printf("successfully updated ip from to %s", public)
 		}
-		backoff.Reset()
-		time.Sleep(time.Second * time.Duration(*refreshInterval))
+	} else {
+		log.Printf("no update needed")
 	}
+	return nil
 }
 
 // getPublicIP returns the internet facing public ip address
