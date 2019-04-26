@@ -32,7 +32,7 @@ func (e *exponentialBackoffSleep) Reset() {
 }
 
 func (e *exponentialBackoffSleep) Sleep() {
-	log.Printf("backoffsleep: %s", backoff)
+	log.Printf("backoffsleep: (current=%s, max=%s)", backoff.current, backoff.maximum)
 	time.Sleep(e.current)
 	e.current = e.current * 2
 	if e.current > e.maximum {
