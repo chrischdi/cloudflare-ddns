@@ -17,8 +17,8 @@ var (
 	zoneName        = flag.String("zone-name", "", "name of the dns zone")
 	dnsName         = flag.String("record-name", "", "name of the dns record to update")
 	refreshInterval = flag.Int64("refresh-interval", 300, "Interval in seconds between record updates (default 300s)")
-	publicIPURL     = flag.String("public-ip-url", "https://checkip.amazonaws.com/", "URL to fetch the current public ip address")
-	maxBackoff      = flag.Duration("mas-backoff", time.Minute*30, "maximum value for exponantial backoff")
+	publicIPURL     = flag.String("public-ip-url", "https://checkip.amazonaws.com/", "URI to fetch the current public ip address")
+	maxBackoff      = flag.Duration("max-backoff", time.Minute*30, "maximum value for exponential backoff")
 	backoff         exponentialBackoffSleep
 )
 
