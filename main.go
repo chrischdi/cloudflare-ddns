@@ -14,8 +14,10 @@ import (
 )
 
 var (
-	zoneName        = flag.String("zone-name", "", "name of the dns zone")
-	dnsName         = flag.String("record-name", "", "name of the dns record to update")
+	zoneName        = flag.String("zone-name", os.Getenv("DNS_ZONE_NAME"), "name of the dns zone (env `DNS_ZONE_NAME`)")
+	dnsName         = flag.String("record-name", os.Getenv("DNS_RECORD_NAME"), "name of the dns record to update (env `DNS_RECORD_NAME`)")
+	cfAPIKey        = flag.String("cf-api-key", os.Getenv("CF_API_KEY"), "cloudflare api key (env `CF_API_KEY`)")
+	cfAPIEMail      = flag.String("cf-api-email", os.Getenv("CF_API_EMAIL"), "cloudflare account e-mail address (env `CF_API_EMAIL`)")
 	refreshInterval = flag.Int64("refresh-interval", 300, "Interval in seconds between record updates (default 300s)")
 	publicIPURL     = flag.String("public-ip-url", "https://checkip.amazonaws.com/", "URI to fetch the current public ip address")
 	maxBackoff      = flag.Duration("max-backoff", time.Minute*30, "maximum value for exponential backoff")
@@ -93,7 +95,7 @@ func run() error {
 func initialize() (api *cloudflare.API, zoneID string, record cloudflare.DNSRecord, err error) {
 	log.Println("creating cloudflare api object")
 	// Construct a new API object
-	api, err = cloudflare.New(os.Getenv("CF_API_KEY"), os.Getenv("CF_API_EMAIL"))
+	api, err = cloudflare.New(*cfAPIKey, *cfAPIEMail)
 	if err != nil {
 		log.Fatal(err)
 	}
