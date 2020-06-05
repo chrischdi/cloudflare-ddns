@@ -54,9 +54,9 @@ load(
 
 _go_image_repos()
 
-# gazelle generated go-repositories.bzl via godeps.sh
+# gazelle generated bazel/go-repositories.bzl via bazel/godeps.sh
 
-load("//:go-repositories.bzl", "go_repositories")
+load("//:bazel/go-repositories.bzl", "go_repositories")
 
-# gazelle:repository_macro go-repositories.bzl%go_repositories
+# gazelle:repository_macro bazel/go-repositories.bzl%go_repositories
 go_repositories()
