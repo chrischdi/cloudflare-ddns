@@ -56,7 +56,7 @@ def go_multiplatform_release(
     container_push(
       name = "push_image_" + name + "-" + os + "-" + arch,
       image = ":image_" + name + "-" + os + "-" + arch,
-      format = "OCI",
+      format = "Docker",
       registry = "index.docker.io",
       repository = "chrischdi/cloudflare-ddns",
       tag = image_tag + "-" + os + "-" + arch,

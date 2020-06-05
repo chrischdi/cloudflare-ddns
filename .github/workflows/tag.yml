@@ -32,18 +32,32 @@ jobs:
 
     - name: Build
       run: |
-        "${GITHUB_WORKSPACE}/bin/bazel" build //...
+        bazel build //...
 
-    - name: Push to dockerhub
+    - name: Docker login
       run: |
         mkdir -p ~/.docker
         echo "${REGISTRY_SECRET}" > ~/.docker/config.json
+      env:
+        REGISTRY_SECRET: ${{ secrets.REGISTRY_SECRET }}
 
+    - name: Push to dockerhub
+      run: |
         for target in $("${GITHUB_WORKSPACE}/bin/bazel" query 'kind("container_push", //...)'); do
           "${GITHUB_WORKSPACE}/bin/bazel" run $target
         done
+
+    - name: Push multi-arch manifest to dockerhub
+      run: |
+        TAG="$(./bazel/status.sh  | grep '^GIT_VERSION' | cut -d' ' -f2)"
+        docker manifest create \
+          chrischdi/cloudflare-ddns:${TAG} \
+          --amend chrischdi/cloudflare-ddns:${TAG}-linux-amd64 \
+          --amend chrischdi/cloudflare-ddns:${TAG}-linux-arm \
+          --amend chrischdi/cloudflare-ddns:${TAG}-linux-arm64
+        docker manifest push chrischdi/cloudflare-ddns:${TAG}
       env:
-        REGISTRY_SECRET: ${{ secrets.REGISTRY_SECRET }}
+        DOCKER_CLI_EXPERIMENTAL: enabled
 
     - name: Release
       uses: ncipollo/release-action@v1
