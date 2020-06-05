@@ -13,42 +13,92 @@ go_library(
 )
 
 go_binary(
-    name = "cloudflare-ddns",
+    name = "cloudflare-ddns-amd64",
     embed = [":go_default_library"],
+    goos = "linux",
+    goarch = "amd64",
+    visibility = ["//visibility:public"],
+)
+go_binary(
+    name = "cloudflare-ddns-arm",
+    embed = [":go_default_library"],
+    goos = "linux",
+    goarch = "arm",
+    visibility = ["//visibility:public"],
+)
+go_binary(
+    name = "cloudflare-ddns-arm64",
+    embed = [":go_default_library"],
+    goos = "linux",
+    goarch = "arm64",
     visibility = ["//visibility:public"],
 )
 
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
-
-go_image(
-    name = "_go_image",
-    embed = [":go_default_library"],
-    visibility = ["//visibility:private"],
-)
-
 load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_push")
 
-
+go_image(
+    name = "_go_image_amd64",
+    embed = [":go_default_library"],
+    goos = "linux",
+    goarch = "amd64",
+    visibility = ["//visibility:private"],
+)
 container_image(
-  name = "go_image",
-  # References container_pull from WORKSPACE (above)
-  base = ":_go_image",
-  architecture = select({
-      "@io_bazel_rules_go//go/platform:linux_arm64": "arm64",
-      "@io_bazel_rules_go//go/platform:linux_arm": "arm",
-      "@io_bazel_rules_go//go/platform:linux_amd64": "amd64",
-  }),
+    name = "go_image_amd64",
+    architecture = "amd64",
+    base = ":_go_image_amd64",
+    visibility = ["//visibility:public"],
+)
+container_push(
+   name = "push_amd64",
+   image = ":go_image_amd64",
+   format = "OCI",
+   registry = "index.docker.io",
+   repository = "chrischdi/cloudflare-ddns",
+   tag = "{GIT_VERSION}-amd64-dev",
 )
 
+go_image(
+    name = "_go_image_arm",
+    embed = [":go_default_library"],
+    goos = "linux",
+    goarch = "arm",
+    visibility = ["//visibility:private"],
+)
+container_image(
+    name = "go_image_arm",
+    architecture = "arm",
+    base = ":_go_image_arm",
+    visibility = ["//visibility:public"],
+)
 container_push(
-   name = "push_image",
-   image = ":go_image",
+   name = "push_arm",
+   image = ":go_image_arm",
    format = "Docker",
    registry = "index.docker.io",
    repository = "chrischdi/cloudflare-ddns",
-   tag = select({
-      "@io_bazel_rules_go//go/platform:linux_arm64": "arm64",
-      "@io_bazel_rules_go//go/platform:linux_arm": "arm",
-      "@io_bazel_rules_go//go/platform:linux_amd64": "amd64",
-  }) + "-dev",
+   tag = "{GIT_VERSION}-arm-dev",
+)
+
+go_image(
+    name = "_go_image_arm64",
+    embed = [":go_default_library"],
+    goos = "linux",
+    goarch = "arm64",
+    visibility = ["//visibility:private"],
+)
+container_image(
+    name = "go_image_arm64",
+    architecture = "arm64",
+    base = ":_go_image_arm64",
+    visibility = ["//visibility:public"],
+)
+container_push(
+   name = "push_arm64",
+   image = ":go_image_arm64",
+   format = "Docker",
+   registry = "index.docker.io",
+   repository = "chrischdi/cloudflare-ddns",
+   tag = "{GIT_VERSION}-arm64-dev",
 )
