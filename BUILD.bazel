@@ -21,7 +21,34 @@ go_binary(
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 
 go_image(
-    name = "go_image",
+    name = "_go_image",
     embed = [":go_default_library"],
-    visibility = ["//visibility:public"],
+    visibility = ["//visibility:private"],
+)
+
+load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_push")
+
+
+container_image(
+  name = "go_image",
+  # References container_pull from WORKSPACE (above)
+  base = ":_go_image",
+  architecture = select({
+      "@io_bazel_rules_go//go/platform:linux_arm64": "arm64",
+      "@io_bazel_rules_go//go/platform:linux_arm": "arm",
+      "@io_bazel_rules_go//go/platform:linux_amd64": "amd64",
+  }),
+)
+
+container_push(
+   name = "push_image",
+   image = ":go_image",
+   format = "Docker",
+   registry = "index.docker.io",
+   repository = "chrischdi/cloudflare-ddns",
+   tag = select({
+      "@io_bazel_rules_go//go/platform:linux_arm64": "arm64",
+      "@io_bazel_rules_go//go/platform:linux_arm": "arm",
+      "@io_bazel_rules_go//go/platform:linux_amd64": "amd64",
+  }) + "-dev",
 )
