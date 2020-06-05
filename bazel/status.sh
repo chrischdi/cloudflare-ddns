@@ -24,6 +24,7 @@ function git_tree_state() {
 function git_version() {
   
   local VERSION_SUFFIX
+  VERSION_SUFFIX=""
   if [[ "$(git_tree_state)" == "dirty" ]]; then
     VERSION_SUFFIX="-dirty"
   fi
