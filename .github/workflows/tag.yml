@@ -1,0 +1,52 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: generate changelog from git
+      run: |
+        TAG="$(./bazel/status.sh  | grep '^GIT_VERSION' | cut -d' ' -f2)"
+        echo "Image is available at \`chrischdi/cloudflare-ddns:${TAG}\`." > ${{ github.workflow }}-CHANGELOG.txt
+        git log --format=format:"* %h %s" $(git describe --tags --abbrev=0 @^)..@ >> ${{ github.workflow }}-CHANGELOG.txt
+
+    - name: Mount bazel cache
+      uses: actions/cache@v1
+      with:
+        path: "/home/runner/.cache/bazel"
+        key: bazel
+
+    - name: Install bazelisk
+      run: |
+        curl -LO "https://github.com/bazelbuild/bazelisk/releases/download/v1.5.0/bazelisk-linux-amd64"
+        mkdir -p "${GITHUB_WORKSPACE}/bin/"
+        mv bazelisk-linux-amd64 "${GITHUB_WORKSPACE}/bin/bazel"
+        chmod +x "${GITHUB_WORKSPACE}/bin/bazel"
+
+    - name: Build
+      run: |
+        "${GITHUB_WORKSPACE}/bin/bazel" build //...
+
+    - name: Push to dockerhub
+      run: |
+        mkdir -p ~/.docker
+        echo "${REGISTRY_SECRET}" > ~/.docker/config.json
+
+        bazel run $(bazel query 'kind("container_push", //...)')
+      env:
+        REGISTRY_SECRET: ${{ secrets.REGISTRY_SECRET }}
+
+    - name: Release
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "bazel-bin/archive-cloudflare-ddns-linux-amd.tar.gz,bazel-bin/archive-cloudflare-ddns-linux-arm.tar.gz,bazel-bin/archive-cloudflare-ddns-linux-arm64.tar.gz,LICENSE"
+        bodyFile: "${{ github.workflow }}-CHANGELOG.txt"
+        token: ${{ secrets.GITHUB_TOKEN }}
+        draft: true
