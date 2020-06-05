@@ -42,7 +42,7 @@ function git_version() {
     return
   fi
 
-  echo "${git rev-parse HEAD}${VERSION_SUFFIX}"
+  echo "$(git rev-parse HEAD)${VERSION_SUFFIX}"
 }
 
 echo "GIT_VERSION $(git_version)"
