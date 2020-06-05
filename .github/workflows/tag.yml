@@ -39,7 +39,9 @@ jobs:
         mkdir -p ~/.docker
         echo "${REGISTRY_SECRET}" > ~/.docker/config.json
 
-        bazel run $(bazel query 'kind("container_push", //...)')
+        for target in $("${GITHUB_WORKSPACE}/bin/bazel" query 'kind("container_push", //...)'); do
+          "${GITHUB_WORKSPACE}/bin/bazel" run $target
+        done
       env:
         REGISTRY_SECRET: ${{ secrets.REGISTRY_SECRET }}
 
