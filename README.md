@@ -36,12 +36,12 @@ go get -u github.com/chrischdi/cloudflare-ddns
 
 # Usage
 
-To use `cloudflare-ddns` you have to set the following Cloudflare credentials by environment variables:
-* `CF_API_EMAIL`: your login e-mail address
-* `CF_API_KEY`: your Cloudflare API key
-Additionaly the following cli parameters are mandatory:
-* `-record-name`
-* `-zone-name`
+To use `cloudflare-ddns` you have to set the following flags either directly or via 
+environment variables:
+* `-cf-api-email`
+* `-cf-api-key`
+* `-record-name DNS_RECORD_NAME`
+* `-refresh-interval int`
 
 # Contribute
 
