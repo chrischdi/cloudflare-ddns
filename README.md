@@ -1,5 +1,5 @@
 # cloudflare-ddns
-[![Build Status](https://travis-ci.org/chrischdi/cloudflare-ddns.svg?branch=master)](https://travis-ci.org/chrischdi/cloudflare-ddns)
+![Build Status](https://github.com/chrischdi/cloudflare-ddns/workflows/.github/workflows/ci.yml/badge.svg)
 
 `cloudflare-ddns` is a client to dynamically update dns records on cloudflare.
 
