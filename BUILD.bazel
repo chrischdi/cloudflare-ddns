@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix github.com/chrischdi/cloudflare-ddns
+gazelle(name = "gazelle")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "github.com/chrischdi/cloudflare-ddns",
+    visibility = ["//visibility:private"],
+    deps = ["@com_github_cloudflare_cloudflare_go//:go_default_library"],
+)
+
+load("//:bazel/multiplatform_image.bzl", "go_multiplatform_release")
+
+go_multiplatform_release(
+    "cloudflare-ddns",
+    ":go_default_library",
+    "{GIT_VERSION}",
+)
+
+go_binary(
+    name = "cloudflare-ddns",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)
