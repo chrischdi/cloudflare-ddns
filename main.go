@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/cloudflare/cloudflare-go"
@@ -20,7 +21,7 @@ var (
 	cfAPIEMail      = flag.String("cf-api-email", os.Getenv("CF_API_EMAIL"), "cloudflare account e-mail address (env `CF_API_EMAIL`)")
 	refreshInterval = flag.Int64("refresh-interval", 300, "Interval in seconds between record updates (default 300s)")
 	publicIPURL     = flag.String("public-ip-url", "https://checkip.amazonaws.com/", "URI to fetch the current public ipv4 address")
-	interfaceName   = flag.String("interface-name", "", "Network interface name to detect public IPv6 address")
+	interfaceName   = flag.String("interface-name", os.Getenv("INTERFACE_NAME"), "Network interface name to detect public IPv6 address")
 	maxBackoff      = flag.Duration("max-backoff", time.Minute*30, "maximum value for exponential backoff")
 	once            = flag.Bool("once", false, "only update once and exit")
 	backoff         exponentialBackoffSleep
@@ -57,11 +58,11 @@ func main() {
 			log.Fatalf("error on initialize: %v", err)
 		}
 
-		if err := updateIPv4(api, zoneID, *recordV4); err != nil {
+		if err := updateIPv4(api, zoneID, recordV4); err != nil {
 			log.Fatalf("error on update: %v", err)
 		}
 
-		if err := updateIPv6(api, zoneID, *recordV6); err != nil {
+		if err := updateIPv6(api, zoneID, recordV6); err != nil {
 			log.Fatalf("error on update: %v", err)
 		}
 		return
@@ -89,10 +90,10 @@ func run() error {
 	}
 
 	for {
-		if err := updateIPv4(api, zoneID, *recordV4); err != nil {
+		if err := updateIPv4(api, zoneID, recordV4); err != nil {
 			return err
 		}
-		if err := updateIPv6(api, zoneID, *recordV6); err != nil {
+		if err := updateIPv6(api, zoneID, recordV6); err != nil {
 			return err
 		}
 		backoff.Reset()
@@ -115,7 +116,7 @@ func initialize() (*cloudflare.API, string, *cloudflare.DNSRecord, *cloudflare.D
 	}
 
 	log.Printf("getting A dns record for name %s", *dnsName)
-	records, err := api.DNSRecords(zoneID, cloudflare.DNSRecord{Type: "A", Name: *dnsName})
+	records, err := api.DNSRecords(zoneID, cloudflare.DNSRecord{Name: *dnsName})
 	if err != nil {
 		return nil, "", nil, nil, fmt.Errorf("error getting dns record: %v", err)
 	}
@@ -124,10 +125,12 @@ func initialize() (*cloudflare.API, string, *cloudflare.DNSRecord, *cloudflare.D
 	var recordV6 *cloudflare.DNSRecord
 	for _, record := range records {
 		if record.Type == "A" {
-			recordV4 = &record
+			r := record
+			recordV4 = &r
 		}
 		if record.Type == "AAAA" {
-			recordV6 = &record
+			r := record
+			recordV6 = &r
 		}
 	}
 
@@ -138,24 +141,32 @@ func initialize() (*cloudflare.API, string, *cloudflare.DNSRecord, *cloudflare.D
 	return api, zoneID, recordV4, recordV6, nil
 }
 
-func updateIPv6(api *cloudflare.API, zoneID string, record cloudflare.DNSRecord) error {
+func updateIPv6(api *cloudflare.API, zoneID string, record *cloudflare.DNSRecord) error {
 	// don't update if no device is given
 	if *interfaceName == "" {
+		return nil
+	}
+	if record == nil {
+		log.Printf("not updating IPv6 - no record found in cloudflare")
 		return nil
 	}
 	public, err := getPublicIPv6()
 	if err != nil {
 		return fmt.Errorf("error getting public ip: %v", err)
 	}
-	return updateRecord(api, zoneID, public, record)
+	return updateRecord(api, zoneID, public, *record)
 }
 
-func updateIPv4(api *cloudflare.API, zoneID string, record cloudflare.DNSRecord) error {
+func updateIPv4(api *cloudflare.API, zoneID string, record *cloudflare.DNSRecord) error {
+	if record == nil {
+		log.Printf("not updating IPv4 - no record found in cloudflare")
+		return nil
+	}
 	public, err := getPublicIPv4()
 	if err != nil {
 		return fmt.Errorf("error getting public ip: %v", err)
 	}
-	return updateRecord(api, zoneID, public, record)
+	return updateRecord(api, zoneID, public, *record)
 }
 
 func updateRecord(api *cloudflare.API, zoneID, public string, record cloudflare.DNSRecord) error {
@@ -175,7 +186,7 @@ func updateRecord(api *cloudflare.API, zoneID, public string, record cloudflare.
 
 // getPublicIPv6 returns the internet facing public IPv6 address
 func getPublicIPv6() (string, error) {
-	iface, err := net.InterfaceByName("wlp59s0")
+	iface, err := net.InterfaceByName(*interfaceName)
 	if err != nil {
 		return "", err
 	}
@@ -209,7 +220,7 @@ func getPublicIPv4() (string, error) {
 		return "", err
 	}
 
-	return string(ip), nil
+	return strings.TrimSuffix(string(ip), "\n"), nil
 }
 
 var disallowedCIDRs = []string{"0.0.0.0/0", "fd00::/8", "fe80::/64", "127.0.0.0/8", "::1/128"}
