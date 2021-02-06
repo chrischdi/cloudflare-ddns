@@ -53,9 +53,13 @@ func main() {
 	}
 
 	if *once {
-		api, zoneID, recordV4, recordV6, err := initialize()
+		api, zoneID, err := initialize()
 		if err != nil {
 			log.Fatalf("error on initialize: %v", err)
+		}
+		recordV4, recordV6, err := getRecords(api, zoneID)
+		if err != nil {
+			log.Fatalf("error on getRecords: %v", err)
 		}
 
 		if err := updateIPv4(api, zoneID, recordV4); err != nil {
@@ -84,12 +88,16 @@ func main() {
 }
 
 func run() error {
-	api, zoneID, recordV4, recordV6, err := initialize()
+	api, zoneID, err := initialize()
 	if err != nil {
 		return err
 	}
 
 	for {
+		recordV4, recordV6, err := getRecords(api, zoneID)
+		if err != nil {
+			log.Fatalf("error on getRecords: %v", err)
+		}
 		if err := updateIPv4(api, zoneID, recordV4); err != nil {
 			return err
 		}
@@ -101,7 +109,7 @@ func run() error {
 	}
 }
 
-func initialize() (*cloudflare.API, string, *cloudflare.DNSRecord, *cloudflare.DNSRecord, error) {
+func initialize() (*cloudflare.API, string, error) {
 	log.Println("creating cloudflare api object")
 	// Construct a new API object
 	api, err := cloudflare.New(*cfAPIKey, *cfAPIEMail)
@@ -112,13 +120,17 @@ func initialize() (*cloudflare.API, string, *cloudflare.DNSRecord, *cloudflare.D
 	log.Printf("getting zone id by name %s", *zoneName)
 	zoneID, err := api.ZoneIDByName(*zoneName)
 	if err != nil {
-		return nil, "", nil, nil, fmt.Errorf("error getting dns zone id by name: %v", err)
+		return nil, "", fmt.Errorf("error getting dns zone id by name: %v", err)
 	}
 
-	log.Printf("getting A dns record for name %s", *dnsName)
+	return api, zoneID, nil
+}
+
+func getRecords(api *cloudflare.API, zoneID string) (*cloudflare.DNSRecord, *cloudflare.DNSRecord, error) {
+	log.Printf("getting dns records for name %s", *dnsName)
 	records, err := api.DNSRecords(zoneID, cloudflare.DNSRecord{Name: *dnsName})
 	if err != nil {
-		return nil, "", nil, nil, fmt.Errorf("error getting dns record: %v", err)
+		return nil, nil, fmt.Errorf("error getting dns record: %v", err)
 	}
 
 	var recordV4 *cloudflare.DNSRecord
@@ -135,10 +147,11 @@ func initialize() (*cloudflare.API, string, *cloudflare.DNSRecord, *cloudflare.D
 	}
 
 	if recordV4 == nil && recordV6 == nil {
-		return nil, "", nil, nil, fmt.Errorf("error getting dns record: expected to at least have either a A or AAAA record")
+		return nil, nil, fmt.Errorf("error getting dns record: expected to at least have either a A or AAAA record")
 	}
 
-	return api, zoneID, recordV4, recordV6, nil
+	return recordV4, recordV6, nil
+
 }
 
 func updateIPv6(api *cloudflare.API, zoneID string, record *cloudflare.DNSRecord) error {
