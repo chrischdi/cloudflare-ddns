@@ -49,13 +49,15 @@ jobs:
 
     - name: Push multi-arch manifest to dockerhub
       run: |
-        TAG="$(./bazel/status.sh  | grep '^GIT_VERSION' | cut -d' ' -f2)"
-        docker manifest create \
-          chrischdi/cloudflare-ddns:${TAG} \
-          --amend chrischdi/cloudflare-ddns:${TAG}-linux-amd64 \
-          --amend chrischdi/cloudflare-ddns:${TAG}-linux-arm \
-          --amend chrischdi/cloudflare-ddns:${TAG}-linux-arm64
-        docker manifest push chrischdi/cloudflare-ddns:${TAG}
+        for SUFFIX in "" "-debug"; do
+          TAG="$(./bazel/status.sh  | grep '^GIT_VERSION' | cut -d' ' -f2)"
+          docker manifest create \
+            "chrischdi/cloudflare-ddns:${TAG}${SUFFIX}" \
+            --amend "chrischdi/cloudflare-ddns:${TAG}-linux-amd64${SUFFIX}" \
+            --amend "chrischdi/cloudflare-ddns:${TAG}-linux-arm${SUFFIX}" \
+            --amend "chrischdi/cloudflare-ddns:${TAG}-linux-arm64${SUFFIX}"
+          docker manifest push "chrischdi/cloudflare-ddns:${TAG}${SUFFIX}"
+        done
       env:
         DOCKER_CLI_EXPERIMENTAL: enabled
 
