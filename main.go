@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -52,21 +53,23 @@ func main() {
 		log.Fatalf("error: record-name parameter is mandatory")
 	}
 
+	ctx := context.Background()
+
 	if *once {
 		api, zoneID, err := initialize()
 		if err != nil {
 			log.Fatalf("error on initialize: %v", err)
 		}
-		recordV4, recordV6, err := getRecords(api, zoneID)
+		recordV4, recordV6, err := getRecords(ctx, api, zoneID)
 		if err != nil {
 			log.Fatalf("error on getRecords: %v", err)
 		}
 
-		if err := updateIPv4(api, zoneID, recordV4); err != nil {
+		if err := updateIPv4(ctx, api, zoneID, recordV4); err != nil {
 			log.Fatalf("error on update: %v", err)
 		}
 
-		if err := updateIPv6(api, zoneID, recordV6); err != nil {
+		if err := updateIPv6(ctx, api, zoneID, recordV6); err != nil {
 			log.Fatalf("error on update: %v", err)
 		}
 		return
@@ -94,14 +97,15 @@ func run() error {
 	}
 
 	for {
-		recordV4, recordV6, err := getRecords(api, zoneID)
+		ctx := context.Background()
+		recordV4, recordV6, err := getRecords(ctx, api, zoneID)
 		if err != nil {
 			log.Fatalf("error on getRecords: %v", err)
 		}
-		if err := updateIPv4(api, zoneID, recordV4); err != nil {
+		if err := updateIPv4(ctx, api, zoneID, recordV4); err != nil {
 			return err
 		}
-		if err := updateIPv6(api, zoneID, recordV6); err != nil {
+		if err := updateIPv6(ctx, api, zoneID, recordV6); err != nil {
 			return err
 		}
 		backoff.Reset()
@@ -126,9 +130,9 @@ func initialize() (*cloudflare.API, string, error) {
 	return api, zoneID, nil
 }
 
-func getRecords(api *cloudflare.API, zoneID string) (*cloudflare.DNSRecord, *cloudflare.DNSRecord, error) {
+func getRecords(ctx context.Context, api *cloudflare.API, zoneID string) (*cloudflare.DNSRecord, *cloudflare.DNSRecord, error) {
 	log.Printf("getting dns records for name %s", *dnsName)
-	records, err := api.DNSRecords(zoneID, cloudflare.DNSRecord{Name: *dnsName})
+	records, err := api.DNSRecords(ctx, zoneID, cloudflare.DNSRecord{Name: *dnsName})
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting dns record: %v", err)
 	}
@@ -151,10 +155,9 @@ func getRecords(api *cloudflare.API, zoneID string) (*cloudflare.DNSRecord, *clo
 	}
 
 	return recordV4, recordV6, nil
-
 }
 
-func updateIPv6(api *cloudflare.API, zoneID string, record *cloudflare.DNSRecord) error {
+func updateIPv6(ctx context.Context, api *cloudflare.API, zoneID string, record *cloudflare.DNSRecord) error {
 	// don't update if no device is given
 	if *interfaceName == "" {
 		return nil
@@ -167,10 +170,10 @@ func updateIPv6(api *cloudflare.API, zoneID string, record *cloudflare.DNSRecord
 	if err != nil {
 		return fmt.Errorf("error getting public ip: %v", err)
 	}
-	return updateRecord(api, zoneID, public, *record)
+	return updateRecord(ctx, api, zoneID, public, *record)
 }
 
-func updateIPv4(api *cloudflare.API, zoneID string, record *cloudflare.DNSRecord) error {
+func updateIPv4(ctx context.Context, api *cloudflare.API, zoneID string, record *cloudflare.DNSRecord) error {
 	if record == nil {
 		log.Printf("not updating IPv4 - no record found in cloudflare")
 		return nil
@@ -179,12 +182,12 @@ func updateIPv4(api *cloudflare.API, zoneID string, record *cloudflare.DNSRecord
 	if err != nil {
 		return fmt.Errorf("error getting public ip: %v", err)
 	}
-	return updateRecord(api, zoneID, public, *record)
+	return updateRecord(ctx, api, zoneID, public, *record)
 }
 
-func updateRecord(api *cloudflare.API, zoneID, public string, record cloudflare.DNSRecord) error {
+func updateRecord(ctx context.Context, api *cloudflare.API, zoneID, public string, record cloudflare.DNSRecord) error {
 	if public != record.Content {
-		err := api.UpdateDNSRecord(zoneID, record.ID, cloudflare.DNSRecord{
+		err := api.UpdateDNSRecord(ctx, zoneID, record.ID, cloudflare.DNSRecord{
 			Content: public,
 		})
 		if err != nil {
