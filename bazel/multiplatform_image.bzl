@@ -61,3 +61,28 @@ def go_multiplatform_release(
       repository = "chrischdi/cloudflare-ddns",
       tag = image_tag + "-" + os + "-" + arch,
     )
+
+    go_image(
+        name = "_image_" + name + "-" + os + "-" + arch + "-debug",
+        base = "@go_debug_image_base//image:image",
+        embed = [target],
+        goos = os,
+        goarch = arch,
+        visibility = ["//visibility:private"],
+    )
+
+    container_image(
+        name = "image_" + name + "-" + os + "-" + arch + "-debug",
+        architecture = arch,
+        base = ":_image_" + name + "-" + os + "-" + arch + "-debug",
+        visibility = ["//visibility:public"],
+    )
+
+    container_push(
+      name = "push_image_" + name + "-" + os + "-" + arch + "-debug",
+      image = ":image_" + name + "-" + os + "-" + arch + "-debug",
+      format = "Docker",
+      registry = "index.docker.io",
+      repository = "chrischdi/cloudflare-ddns",
+      tag = image_tag + "-" + os + "-" + arch + "-debug",
+    )
