@@ -9,23 +9,11 @@ jobs:
     steps:
     - uses: actions/checkout@v1
 
-    - name: Mount bazel cache
-      uses: actions/cache@v1
+    - name: Set up Go
+      uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # tag=v4.1.0
       with:
-        path: "/home/runner/.cache/bazel"
-        key: bazel
-
-    - name: Install bazelisk
-      run: |
-        curl -LO "https://github.com/bazelbuild/bazelisk/releases/download/v1.10.1/bazelisk-linux-amd64"
-        mkdir -p "${GITHUB_WORKSPACE}/bin/"
-        mv bazelisk-linux-amd64 "${GITHUB_WORKSPACE}/bin/bazel"
-        chmod +x "${GITHUB_WORKSPACE}/bin/bazel"
-
-    # - name: Test
-    #   run: |
-    #     "${GITHUB_WORKSPACE}/bin/bazel" test //...
+        go-version: "1.21.3"
 
     - name: Build
       run: |
-        "${GITHUB_WORKSPACE}/bin/bazel" build //...
+        ./build.sh
