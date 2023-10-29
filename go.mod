@@ -1,6 +1,6 @@
 module github.com/chrischdi/cloudflare-ddns
 
-go 1.19
+go 1.21
 
 require github.com/cloudflare/cloudflare-go v0.79.0
 
