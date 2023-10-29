@@ -1,8 +1,0 @@
-# set values for binary stamping
-# --stamp enforces stamping for bazel build runs - this is necessary to propagate
-# the values ./go/t1/status.sh to from  get t1.Init()
-#
-# https://docs.bazel.build/versions/master/user-manual.html#flag--stamp
-# https://github.com/bazelbuild/rules_go/blob/master/go/core.rst#design
-build --stamp --workspace_status_command ./bazel/status.sh
-

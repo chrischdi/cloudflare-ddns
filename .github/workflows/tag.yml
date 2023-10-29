@@ -11,28 +11,36 @@ jobs:
     steps:
     - uses: actions/checkout@v1
 
+    - name: Set up Go
+      uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # tag=v4.1.0
+      with:
+        go-version: "1.21.3"
+
+    - name: build binaries and tar balls
+      run: |
+        ./build.sh
+
+    - name: build docker images
+      run: |
+        TAG="$(./hack/version.sh)"
+        
+        for ARCH in amd64 arm64 arm; do
+          cp bin/linux/${ARCH}/cloudflare-ddns .
+          docker build -t chrischdi/cloudflare-ddns:${TAG}-linux-amd64 .
+          rm cloudflare-ddns
+        done
+        
+        docker manifest create \
+          "chrischdi/cloudflare-ddns:${TAG}" \
+          --amend "chrischdi/cloudflare-ddns:${TAG}-linux-amd64" \
+          --amend "chrischdi/cloudflare-ddns:${TAG}-linux-arm" \
+          --amend "chrischdi/cloudflare-ddns:${TAG}-linux-arm64"
+
     - name: generate changelog from git
       run: |
-        TAG="$(./bazel/status.sh  | grep '^GIT_VERSION' | cut -d' ' -f2)"
+        TAG="$(./hack/version.sh)"
         echo "Image is available at \`chrischdi/cloudflare-ddns:${TAG}\`." > ${{ github.workflow }}-CHANGELOG.txt
         git log --format=format:"* %h %s" $(git describe --tags --abbrev=0 @^)..@ >> ${{ github.workflow }}-CHANGELOG.txt
-
-    - name: Mount bazel cache
-      uses: actions/cache@v1
-      with:
-        path: "/home/runner/.cache/bazel"
-        key: bazel
-
-    - name: Install bazelisk
-      run: |
-        curl -LO "https://github.com/bazelbuild/bazelisk/releases/download/v1.5.0/bazelisk-linux-amd64"
-        mkdir -p "${GITHUB_WORKSPACE}/bin/"
-        mv bazelisk-linux-amd64 "${GITHUB_WORKSPACE}/bin/bazel"
-        chmod +x "${GITHUB_WORKSPACE}/bin/bazel"
-
-    - name: Build
-      run: |
-        bazel build //...
 
     - name: Docker login
       run: |
@@ -41,30 +49,21 @@ jobs:
       env:
         REGISTRY_SECRET: ${{ secrets.REGISTRY_SECRET }}
 
-    - name: Push to dockerhub
+    - name: Push docker images
       run: |
-        for target in $("${GITHUB_WORKSPACE}/bin/bazel" query 'kind("container_push", //...)'); do
-          "${GITHUB_WORKSPACE}/bin/bazel" run $target
+        TAG="$(./hack/version.sh)"
+        for ARCH in amd64 arm64 arm; do
+          docker push chrischdi/cloudflare-ddns:${TAG}-linux-${ARCH}
         done
-
-    - name: Push multi-arch manifest to dockerhub
-      run: |
-        for SUFFIX in "" "-debug"; do
-          TAG="$(./bazel/status.sh  | grep '^GIT_VERSION' | cut -d' ' -f2)"
-          docker manifest create \
-            "chrischdi/cloudflare-ddns:${TAG}${SUFFIX}" \
-            --amend "chrischdi/cloudflare-ddns:${TAG}-linux-amd64${SUFFIX}" \
-            --amend "chrischdi/cloudflare-ddns:${TAG}-linux-arm${SUFFIX}" \
-            --amend "chrischdi/cloudflare-ddns:${TAG}-linux-arm64${SUFFIX}"
-          docker manifest push "chrischdi/cloudflare-ddns:${TAG}${SUFFIX}"
-        done
+        
+        docker manifest push "chrischdi/cloudflare-ddns:${TAG}"
       env:
         DOCKER_CLI_EXPERIMENTAL: enabled
 
     - name: Release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: "bazel-bin/archive-cloudflare-ddns-linux-amd.tar.gz,bazel-bin/archive-cloudflare-ddns-linux-arm.tar.gz,bazel-bin/archive-cloudflare-ddns-linux-arm64.tar.gz,LICENSE"
+        artifacts: "tar/cloudflare-ddns-linux-amd64.tar.gz,tar/cloudflare-ddns-linux-arm.tar.gz,tar/cloudflare-ddns-linux-arm64.tar.gz,LICENSE"
         bodyFile: "${{ github.workflow }}-CHANGELOG.txt"
         token: ${{ secrets.GITHUB_TOKEN }}
         draft: true
