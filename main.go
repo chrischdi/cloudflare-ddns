@@ -132,7 +132,7 @@ func initialize() (*cloudflare.API, string, error) {
 
 func getRecords(ctx context.Context, api *cloudflare.API, zoneID string) (*cloudflare.DNSRecord, *cloudflare.DNSRecord, error) {
 	log.Printf("getting dns records for name %s", *dnsName)
-	records, err := api.DNSRecords(ctx, zoneID, cloudflare.DNSRecord{Name: *dnsName})
+	records, _, err := api.ListDNSRecords(ctx, cloudflare.ZoneIdentifier(zoneID), cloudflare.ListDNSRecordsParams{Name: *dnsName})
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting dns record: %v", err)
 	}
@@ -187,9 +187,7 @@ func updateIPv4(ctx context.Context, api *cloudflare.API, zoneID string, record 
 
 func updateRecord(ctx context.Context, api *cloudflare.API, zoneID, public string, record cloudflare.DNSRecord) error {
 	if public != record.Content {
-		err := api.UpdateDNSRecord(ctx, zoneID, record.ID, cloudflare.DNSRecord{
-			Content: public,
-		})
+		_, err := api.UpdateDNSRecord(ctx, cloudflare.ZoneIdentifier(zoneID), cloudflare.UpdateDNSRecordParams{Content: public})
 		if err != nil {
 			return fmt.Errorf("error updating dns record from %s to %s: %v", record.Content, public, err)
 		}
