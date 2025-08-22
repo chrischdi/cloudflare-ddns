@@ -15,7 +15,7 @@ spec:
             envFrom:
             - secretRef:
                 name: cloudflare-ddns
-            image: chrischdi/cloudflare-ddns:v0.4.0
+            image: chrischdi/cloudflare-ddns:v0.8.0
             imagePullPolicy: IfNotPresent
             name: cloudflare-ddns
           dnsConfig:
