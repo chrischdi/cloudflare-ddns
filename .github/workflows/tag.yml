@@ -22,11 +22,11 @@ jobs:
 
     - name: build docker images
       run: |
-        TAG="$(./hack/version.sh)"
+        TAG="$(./hack/version.sh | cut -d ' ' -f 2)"
         
         for ARCH in amd64 arm64 arm; do
           cp bin/linux/${ARCH}/cloudflare-ddns .
-          docker build -t chrischdi/cloudflare-ddns:${TAG}-linux-amd64 .
+          docker build --platform linux/${ARCH} -t chrischdi/cloudflare-ddns:${TAG}-linux-${ARCH} .
           rm cloudflare-ddns
         done
         
@@ -38,7 +38,7 @@ jobs:
 
     - name: generate changelog from git
       run: |
-        TAG="$(./hack/version.sh)"
+        TAG="$(./hack/version.sh | cut -d ' ' -f 2)"
         echo "Image is available at \`chrischdi/cloudflare-ddns:${TAG}\`." > ${{ github.workflow }}-CHANGELOG.txt
         git log --format=format:"* %h %s" $(git describe --tags --abbrev=0 @^)..@ >> ${{ github.workflow }}-CHANGELOG.txt
 
@@ -51,7 +51,7 @@ jobs:
 
     - name: Push docker images
       run: |
-        TAG="$(./hack/version.sh)"
+        TAG="$(./hack/version.sh | cut -d ' ' -f 2)"
         for ARCH in amd64 arm64 arm; do
           docker push chrischdi/cloudflare-ddns:${TAG}-linux-${ARCH}
         done
