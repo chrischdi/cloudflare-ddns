@@ -18,6 +18,7 @@ import (
 var (
 	zoneName        = flag.String("zone-name", os.Getenv("DNS_ZONE_NAME"), "name of the dns zone (env `DNS_ZONE_NAME`)")
 	dnsName         = flag.String("record-name", os.Getenv("DNS_RECORD_NAME"), "name of the dns record to update (env `DNS_RECORD_NAME`)")
+	dnsNames        = flag.String("record-names", os.Getenv("DNS_RECORD_NAMES"), "comma separated list of of the dns records to update (env `DNS_RECORD_NAMES`)")
 	cfAPIKey        = flag.String("cf-api-key", os.Getenv("CF_API_KEY"), "cloudflare api key (env `CF_API_KEY`)")
 	cfAPIEMail      = flag.String("cf-api-email", os.Getenv("CF_API_EMAIL"), "cloudflare account e-mail address (env `CF_API_EMAIL`)")
 	refreshInterval = flag.Int64("refresh-interval", 300, "Interval in seconds between record updates (default 300s)")
@@ -49,8 +50,13 @@ func (e *exponentialBackoffSleep) Sleep() {
 func main() {
 	flag.Parse()
 
-	if *dnsName == "" {
+	if *dnsName == "" && *dnsNames == "" {
 		log.Fatalf("error: record-name parameter is mandatory")
+	}
+
+	allDNSNames := strings.Split(*dnsNames, ",")
+	if *dnsName != "" {
+		allDNSNames = append(allDNSNames, *dnsName)
 	}
 
 	ctx := context.Background()
@@ -60,17 +66,12 @@ func main() {
 		if err != nil {
 			log.Fatalf("error on initialize: %v", err)
 		}
-		recordV4, recordV6, err := getRecords(ctx, api, zoneID)
-		if err != nil {
-			log.Fatalf("error on getRecords: %v", err)
-		}
-
-		if err := updateIPv4(ctx, api, zoneID, recordV4); err != nil {
-			log.Fatalf("error on update: %v", err)
-		}
-
-		if err := updateIPv6(ctx, api, zoneID, recordV6); err != nil {
-			log.Fatalf("error on update: %v", err)
+		for _, dnsName := range allDNSNames {
+			if err := runOnce(ctx, api, zoneID, dnsName); err != nil {
+				log.Fatalf("error updating record for %s: %v", dnsName, err)
+			} else {
+				log.Printf("successfully updated record %s", dnsName)
+			}
 		}
 		return
 	}
@@ -82,7 +83,7 @@ func main() {
 
 	var err error
 	for {
-		err = run()
+		err = run(allDNSNames)
 		if err != nil {
 			log.Printf("error: %v", err)
 			backoff.Sleep()
@@ -90,7 +91,7 @@ func main() {
 	}
 }
 
-func run() error {
+func run(dnsNames []string) error {
 	api, zoneID, err := initialize()
 	if err != nil {
 		return err
@@ -98,19 +99,28 @@ func run() error {
 
 	for {
 		ctx := context.Background()
-		recordV4, recordV6, err := getRecords(ctx, api, zoneID)
-		if err != nil {
-			log.Fatalf("error on getRecords: %v", err)
-		}
-		if err := updateIPv4(ctx, api, zoneID, recordV4); err != nil {
-			return err
-		}
-		if err := updateIPv6(ctx, api, zoneID, recordV6); err != nil {
-			return err
+		for _, dnsName := range dnsNames {
+			if err := runOnce(ctx, api, zoneID, dnsName); err != nil {
+				return err
+			}
 		}
 		backoff.Reset()
 		time.Sleep(time.Second * time.Duration(*refreshInterval))
 	}
+}
+
+func runOnce(ctx context.Context, api *cloudflare.API, zoneID, dnsName string) error {
+	recordV4, recordV6, err := getRecords(ctx, api, zoneID, dnsName)
+	if err != nil {
+		log.Fatalf("error on getRecords: %v", err)
+	}
+	if err := updateIPv4(ctx, api, zoneID, recordV4); err != nil {
+		return err
+	}
+	if err := updateIPv6(ctx, api, zoneID, recordV6); err != nil {
+		return err
+	}
+	return nil
 }
 
 func initialize() (*cloudflare.API, string, error) {
@@ -130,9 +140,9 @@ func initialize() (*cloudflare.API, string, error) {
 	return api, zoneID, nil
 }
 
-func getRecords(ctx context.Context, api *cloudflare.API, zoneID string) (*cloudflare.DNSRecord, *cloudflare.DNSRecord, error) {
-	log.Printf("getting dns records for name %s", *dnsName)
-	records, _, err := api.ListDNSRecords(ctx, cloudflare.ZoneIdentifier(zoneID), cloudflare.ListDNSRecordsParams{Name: *dnsName})
+func getRecords(ctx context.Context, api *cloudflare.API, zoneID, dnsName string) (*cloudflare.DNSRecord, *cloudflare.DNSRecord, error) {
+	log.Printf("getting dns records for name %s", dnsName)
+	records, _, err := api.ListDNSRecords(ctx, cloudflare.ZoneIdentifier(zoneID), cloudflare.ListDNSRecordsParams{Name: dnsName})
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting dns record: %v", err)
 	}
